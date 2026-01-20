@@ -8,11 +8,12 @@ Using skeleton code from the assignment description.
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 
 #include <iostream>
 
-using namespace cv;
+#include "../include/filter.h"
 
 int main(int argc, char *argv[]) {
         cv::VideoCapture *capdev;
@@ -50,6 +51,21 @@ int main(int argc, char *argv[]) {
                     std::string filename = "frame_" + std::to_string(frameCount) + ".jpg";
                     cv::imwrite(filename, frame);
                     frameCount++;
+                }
+                else if (key == 'g') {
+                    cv::Mat greyFrame;
+                    cv::cvtColor(frame, greyFrame, cv::COLOR_BGR2GRAY);
+                    cv::imshow("Greyscale Image", greyFrame);
+                }
+                else if (key == 'h') {
+                    cv::Mat greyFrame_custom;
+                    greyscale(frame, greyFrame_custom);
+                    cv::imshow("Greyscale Image - Average", greyFrame_custom);
+                }
+                else if (key == 'j') {
+                    cv::Mat sepiaFrame;
+                    sepia(frame, sepiaFrame);
+                    cv::imshow("Sepia Image", sepiaFrame);
                 }
         }
 
