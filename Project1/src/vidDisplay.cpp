@@ -1,9 +1,18 @@
 /*
-Jaee Oh
+  Jaee Oh
+  Spring 2026
 
-CS5330 Computer Vision Project 1: Task 2
+  CS 5330 Computer Vision
 
-Using skeleton code from the assignment description.
+  Project 1.
+
+  Skeleton code provided on the assignment page was used as a template.
+
+  OpenCV Documentation was the final source for verification of each function.
+  (https://docs.opencv.org/4.x/d9/df8/tutorial_root.html)
+  AI Overview of Google was used to find related functions.
+  Claude AI was used for code review and debugging.
+
 */
 
 #include <opencv2/core.hpp>
@@ -66,6 +75,23 @@ int main(int argc, char *argv[]) {
                     cv::Mat sepiaFrame;
                     sepia(frame, sepiaFrame);
                     cv::imshow("Sepia Image", sepiaFrame);
+                }
+                else if (key == 'b') {
+                    cv::Mat blurFrame;
+                    blur5x5_2(frame, blurFrame);
+                    cv::imshow("Blurred Image", blurFrame);
+                }
+                else if (key == 'x') {
+                    cv::Mat sobelXFrame, displayX;
+                    sobelX3x3(frame, sobelXFrame);
+                    cv::convertScaleAbs(sobelXFrame, displayX); // Convert to 8-bit for display.
+                    cv::imshow("Sobel X Image", displayX);
+                }
+                else if (key == 'y') {
+                    cv::Mat sobelYFrame, displayY;
+                    sobelY3x3(frame, sobelYFrame);
+                    cv::convertScaleAbs(sobelYFrame, displayY); // Convert to 8-bit for display.
+                    cv::imshow("Sobel Y Image", displayY);
                 }
         }
 

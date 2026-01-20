@@ -10,3 +10,8 @@ add_executable( vidDisplay
     src/vidDisplay.cpp 
     src/filter.cpp
 )
+
+add_executable( timeBlur
+    src/timeBlur.cpp 
+    src/filter.cpp
+)
