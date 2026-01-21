@@ -23,6 +23,7 @@
 #include <iostream>
 
 #include "../include/filter.h"
+#include "../include/faceDetect.h"
 
 int main(int argc, char *argv[]) {
         cv::VideoCapture *capdev;
@@ -92,6 +93,29 @@ int main(int argc, char *argv[]) {
                     sobelY3x3(frame, sobelYFrame);
                     cv::convertScaleAbs(sobelYFrame, displayY); // Convert to 8-bit for display.
                     cv::imshow("Sobel Y Image", displayY);
+                }
+                else if (key == 'm') {
+                    cv::Mat sobelXFrame, sobelYFrame, magnitudeFrame;
+                    sobelX3x3(frame, sobelXFrame);
+                    sobelY3x3(frame, sobelYFrame);
+                    magnitude(sobelXFrame, sobelYFrame, magnitudeFrame);
+                    cv::imshow("Sobel Magnitude Image", magnitudeFrame);
+                }
+                else if (key == 'i') {
+                    cv::Mat blurQuantFrame;
+                    int levels = 7; // Quantization level.
+                    blurQuantize(frame, blurQuantFrame, levels);
+                    cv::imshow("Blured and Quantized Image", blurQuantFrame);
+                }
+                else if (key == 'f') {
+                    cv::Mat greyFrame;
+                    cv::cvtColor(frame, greyFrame, cv::COLOR_BGR2GRAY);
+                    std::vector<cv::Rect> faces;
+                    detectFaces(greyFrame, faces);
+                    for (size_t i = 0; i < faces.size(); i++) {
+                        cv::rectangle(frame, faces[i], cv::Scalar(0, 255, 0), 2);
+                    }
+                    cv::imshow("Face Detection", frame);
                 }
         }
 

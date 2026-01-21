@@ -248,4 +248,63 @@ int sobelY3x3(const cv::Mat &src, cv::Mat &dst ) {
     }
 
     return 0;
-}   
+}
+
+int magnitude(const cv::Mat &sx, const cv::Mat &sy, cv::Mat &dst) {
+    if (sx.empty() || sy.empty()) {
+        return -1;
+    }
+
+    dst.create(sx.size(), CV_8UC3); // Use 3 channel uchar type for final magnitude image, since sqrt give unsigned values.
+
+    // Loop through each pixel in the image.
+    for (int i = 0; i < sx.rows; ++i) {
+        const cv::Vec3s* sxRow = sx.ptr<cv::Vec3s>(i); // Pointer to the sx row.
+        const cv::Vec3s* syRow = sy.ptr<cv::Vec3s>(i); // Pointer to the sy row.
+        cv::Vec3b* dstRow = dst.ptr<cv::Vec3b>(i); // Pointer to the dst row. Type is 0-255 since sqrt gives positive only.
+
+        for (int j = 0; j < sx.cols; ++j) {
+            // Euclidean distance for each channel.
+            for (int c = 0; c < 3; ++c) {
+                int val_sx = static_cast<int>(sxRow[j][c]);
+                int val_sy = static_cast<int>(syRow[j][c]);
+                int magnitude = static_cast<int>(std::sqrt(val_sx * val_sx + val_sy * val_sy));
+                dstRow[j][c] = static_cast<uchar>(magnitude); // uchar type for 0-255.
+            }
+        }
+    }
+
+    return 0;
+
+}
+
+int blurQuantize( const cv::Mat &src, cv::Mat &dst, int levels ) {
+    if (src.empty() || levels <= 0) {
+        return -1;
+    }
+
+    dst.create(src.size(), src.type()); // Initialize output image.
+
+    cv::Mat tempBlur;
+    blur5x5_2(src, tempBlur); // Apply blur to the input.
+
+    int interval = 255 / levels; // Define quantization interval. It must be integer.
+
+    // Loop through each pixel in the image.
+    for (int i = 0; i < src.rows; ++i) {
+        const cv::Vec3b* srcRow = src.ptr<cv::Vec3b>(i); // Pointer to the input row.
+        cv::Vec3b* dstRow = dst.ptr<cv::Vec3b>(i); // Pointer to the output row.
+        for (int j = 0; j < src.cols; ++j) {
+
+            // Apply quantization to 3 channels.
+            for (int c = 0; c < 3; ++c) {
+                int quantized_value = (srcRow[j][c] / interval) * interval;
+                if (quantized_value > 255) {
+                    quantized_value = 255; // Ensure value does not exceed 255.
+                }
+                dstRow[j][c] = static_cast<uchar>(quantized_value);
+            }
+        }
+    }
+    return 0;
+}
