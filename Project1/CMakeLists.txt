@@ -23,7 +23,7 @@ add_executable( vidDisplay
     src/filter.cpp
     src/faceDetect.cpp
 )
-target_link_libraries( vidDisplay ${OpenCV_LIBS} )
+target_link_libraries( vidDisplay ${OpenCV_LIBS} onnxruntime )
 
 add_executable( timeBlur
     src/timeBlur.cpp 
