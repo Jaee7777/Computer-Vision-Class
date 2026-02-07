@@ -15,7 +15,9 @@ link_directories(${ONNXRUNTIME_ROOT}/lib)
 # Include directory for your headers (DA2Network.hpp)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-add_executable( imgDisplay src/imgDisplay.cpp )
+add_executable( imgDisplay
+    src/imgDisplay.cpp
+    src/filter.cpp )
 target_link_libraries( imgDisplay ${OpenCV_LIBS} )
 
 add_executable( vidDisplay 

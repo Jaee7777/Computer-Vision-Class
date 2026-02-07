@@ -4,6 +4,7 @@ cmake-build-*/
 out/
 data/
 model/
+test/
 
 # Compiled files
 *.o
