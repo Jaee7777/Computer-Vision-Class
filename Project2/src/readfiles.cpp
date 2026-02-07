@@ -17,14 +17,21 @@
 #include <algorithm>
 #include <string>
 #include <functional>
+#include <cmath>
 
 // Function declarations
 std::vector<float> extract_feature_vector(const cv::Mat &image);
 float compute_ssd(const std::vector<float> &a, const std::vector<float> &b);
 std::vector<std::vector<std::vector<float>>> compute_3D_histogram(const cv::Mat &image, int bins);
 std::vector<std::vector<std::vector<float>>> compute_3D_histogram_region(const cv::Mat &image, int bins, int start_row, int end_row);
+std::vector<std::vector<float>> compute_texture_histogram(const cv::Mat &image, int mag_bins, int angle_bins);
+std::vector<float> compute_gabor_features(const cv::Mat &image);
+cv::Mat create_gabor_kernel(int ksize, double sigma, double theta, double lambda, double gamma, double psi);
 float histogram_intersection_3D(const std::vector<std::vector<std::vector<float>>> &hist1, 
                                 const std::vector<std::vector<std::vector<float>>> &hist2);
+float histogram_intersection_2D(const std::vector<std::vector<float>> &hist1,
+                                const std::vector<std::vector<float>> &hist2);
+float compute_cosine_similarity(const std::vector<float> &a, const std::vector<float> &b);
 
 struct ImageMatch {
     std::string filename;
@@ -280,9 +287,197 @@ int main(int argc, char *argv[]) {
             printf("Match %d: %s with intersection = %.4f\n", i + 1, matches[i].filename.c_str(), matches[i].score);
         }
         
+    } else if(method == "color-texture") {
+        printf("Using color + texture histogram matching method\n");
+        printf("Color: RGB 8x8x8 bins, Texture: Gradient magnitude & orientation 16x16 bins\n");
+        
+        // Compute target histograms
+        std::vector<std::vector<std::vector<float>>> target_color_hist = compute_3D_histogram(target_image, 8);
+        std::vector<std::vector<float>> target_texture_hist = compute_texture_histogram(target_image, 16, 16);
+        
+        // Vector to store file names and scores
+        std::vector<ImageMatch> matches;
+
+        // Loop over all the files in the image file listing
+        while((dp = readdir(dirp)) != NULL) {
+
+            // Check if the file is an image
+            if(strstr(dp->d_name, ".jpg") ||
+               strstr(dp->d_name, ".png") ||
+               strstr(dp->d_name, ".ppm") ||
+               strstr(dp->d_name, ".tif")) {
+
+                printf("processing image file: %s\n", dp->d_name);
+
+                // Build the overall filename
+                strcpy(buffer, dirname);
+                strcat(buffer, "/");
+                strcat(buffer, dp->d_name);
+
+                printf("full path name: %s\n", buffer);
+
+                // Find histograms for the image
+                cv::Mat image = cv::imread(buffer, cv::IMREAD_COLOR);
+                if(image.empty()) {
+                    printf("Could not read image %s\n", buffer);
+                    continue;
+                }
+                
+                std::vector<std::vector<std::vector<float>>> color_hist = compute_3D_histogram(image, 8);
+                std::vector<std::vector<float>> texture_hist = compute_texture_histogram(image, 16, 16);
+
+                // Compute intersections
+                float color_intersection = histogram_intersection_3D(target_color_hist, color_hist);
+                float texture_intersection = histogram_intersection_2D(target_texture_hist, texture_hist);
+                
+                // Weighted combination (50% color, 50% texture)
+                float combined_score = 0.5f * color_intersection + 0.5f * texture_intersection;
+                
+                printf("Color: %.4f, Texture: %.4f, Combined: %.4f\n", 
+                       color_intersection, texture_intersection, combined_score);
+
+                // Store the result
+                ImageMatch match;
+                match.filename = buffer;
+                match.score = combined_score;
+                matches.push_back(match);
+            }
+        }
+
+        // Sort matches by combined score (descending - higher is better)
+        std::sort(matches.begin(), matches.end(), compare_descending);
+        
+        printf("\nTop %d matches:\n", top_n);
+        for(int i = 0; i < top_n && i < (int)matches.size(); i++) {
+            printf("Match %d: %s with combined score = %.4f\n", i + 1, matches[i].filename.c_str(), matches[i].score);
+        }
+        
+    } else if(method == "gabor") {
+        printf("Using Gabor filter-based texture matching method\n");
+        printf("Extracting multi-scale, multi-orientation Gabor features\n");
+        
+        // Compute target Gabor features
+        std::vector<float> target_gabor_features = compute_gabor_features(target_image);
+        
+        // Vector to store file names and scores
+        std::vector<ImageMatch> matches;
+
+        // Loop over all the files in the image file listing
+        while((dp = readdir(dirp)) != NULL) {
+
+            // Check if the file is an image
+            if(strstr(dp->d_name, ".jpg") ||
+               strstr(dp->d_name, ".png") ||
+               strstr(dp->d_name, ".ppm") ||
+               strstr(dp->d_name, ".tif")) {
+
+                printf("processing image file: %s\n", dp->d_name);
+
+                // Build the overall filename
+                strcpy(buffer, dirname);
+                strcat(buffer, "/");
+                strcat(buffer, dp->d_name);
+
+                printf("full path name: %s\n", buffer);
+
+                // Find Gabor features for the image
+                cv::Mat image = cv::imread(buffer, cv::IMREAD_COLOR);
+                if(image.empty()) {
+                    printf("Could not read image %s\n", buffer);
+                    continue;
+                }
+                
+                std::vector<float> gabor_features = compute_gabor_features(image);
+
+                // Compute similarity using cosine similarity
+                float similarity = compute_cosine_similarity(target_gabor_features, gabor_features);
+                
+                printf("Gabor similarity: %.4f\n", similarity);
+
+                // Store the result
+                ImageMatch match;
+                match.filename = buffer;
+                match.score = similarity;
+                matches.push_back(match);
+            }
+        }
+
+        // Sort matches by similarity (descending - higher is better)
+        std::sort(matches.begin(), matches.end(), compare_descending);
+        
+        printf("\nTop %d matches:\n", top_n);
+        for(int i = 0; i < top_n && i < (int)matches.size(); i++) {
+            printf("Match %d: %s with Gabor similarity = %.4f\n", i + 1, matches[i].filename.c_str(), matches[i].score);
+        }
+        
+    } else if(method == "color-gabor") {
+        printf("Using color + Gabor texture matching method\n");
+        printf("Color: RGB 8x8x8 bins, Texture: Multi-scale Gabor filters\n");
+        
+        // Compute target features
+        std::vector<std::vector<std::vector<float>>> target_color_hist = compute_3D_histogram(target_image, 8);
+        std::vector<float> target_gabor_features = compute_gabor_features(target_image);
+        
+        // Vector to store file names and scores
+        std::vector<ImageMatch> matches;
+
+        // Loop over all the files in the image file listing
+        while((dp = readdir(dirp)) != NULL) {
+
+            // Check if the file is an image
+            if(strstr(dp->d_name, ".jpg") ||
+               strstr(dp->d_name, ".png") ||
+               strstr(dp->d_name, ".ppm") ||
+               strstr(dp->d_name, ".tif")) {
+
+                printf("processing image file: %s\n", dp->d_name);
+
+                // Build the overall filename
+                strcpy(buffer, dirname);
+                strcat(buffer, "/");
+                strcat(buffer, dp->d_name);
+
+                printf("full path name: %s\n", buffer);
+
+                // Find features for the image
+                cv::Mat image = cv::imread(buffer, cv::IMREAD_COLOR);
+                if(image.empty()) {
+                    printf("Could not read image %s\n", buffer);
+                    continue;
+                }
+                
+                std::vector<std::vector<std::vector<float>>> color_hist = compute_3D_histogram(image, 8);
+                std::vector<float> gabor_features = compute_gabor_features(image);
+
+                // Compute similarities
+                float color_intersection = histogram_intersection_3D(target_color_hist, color_hist);
+                float gabor_similarity = compute_cosine_similarity(target_gabor_features, gabor_features);
+                
+                // Weighted combination (50% color, 50% Gabor texture)
+                float combined_score = 0.5f * color_intersection + 0.5f * gabor_similarity;
+                
+                printf("Color: %.4f, Gabor: %.4f, Combined: %.4f\n", 
+                       color_intersection, gabor_similarity, combined_score);
+
+                // Store the result
+                ImageMatch match;
+                match.filename = buffer;
+                match.score = combined_score;
+                matches.push_back(match);
+            }
+        }
+
+        // Sort matches by combined score (descending - higher is better)
+        std::sort(matches.begin(), matches.end(), compare_descending);
+        
+        printf("\nTop %d matches:\n", top_n);
+        for(int i = 0; i < top_n && i < (int)matches.size(); i++) {
+            printf("Match %d: %s with combined score = %.4f\n", i + 1, matches[i].filename.c_str(), matches[i].score);
+        }
+        
     } else {
         printf("Unknown matching method: %s\n", method.c_str());
-        printf("Available methods: ssd, histogram, multi-histogram\n");
+        printf("Available methods: ssd, histogram, multi-histogram, color-texture, gabor, color-gabor\n");
         closedir(dirp);
         exit(-1);
     }
@@ -397,7 +592,7 @@ std::vector<std::vector<std::vector<float>>> compute_3D_histogram(const cv::Mat 
     return histogram;
 }
 
-// Compute 3D histogram for a specific row region (RGB color space with 8 bins per channel)
+// Compute 3D histogram for a specific row region
 std::vector<std::vector<std::vector<float>>> compute_3D_histogram_region(
     const cv::Mat &image, int bins, int start_row, int end_row) {
     
@@ -454,6 +649,194 @@ std::vector<std::vector<std::vector<float>>> compute_3D_histogram_region(
     return histogram;
 }
 
+// Compute 2D texture histogram based on gradient magnitude and orientation
+std::vector<std::vector<float>> compute_texture_histogram(const cv::Mat &image, int mag_bins, int angle_bins) {
+    // Initialize 2D histogram with zeros
+    std::vector<std::vector<float>> histogram(mag_bins, std::vector<float>(angle_bins, 0.0f));
+    
+    // Convert to grayscale
+    cv::Mat gray;
+    if(image.channels() == 3) {
+        cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+    } else {
+        gray = image.clone();
+    }
+    
+    // Compute gradients using Sobel operator
+    cv::Mat grad_x, grad_y;
+    cv::Sobel(gray, grad_x, CV_32F, 1, 0, 3);  // Gradient in x direction
+    cv::Sobel(gray, grad_y, CV_32F, 0, 1, 3);  // Gradient in y direction
+    
+    // Compute magnitude and angle for each pixel
+    for(int i = 0; i < gray.rows; i++) {
+        for(int j = 0; j < gray.cols; j++) {
+            float gx = grad_x.at<float>(i, j);
+            float gy = grad_y.at<float>(i, j);
+            
+            // Calculate magnitude
+            float magnitude = std::sqrt(gx * gx + gy * gy);
+            
+            // Calculate angle in degrees (0-360)
+            float angle = std::atan2(gy, gx) * 180.0f / M_PI;
+            if(angle < 0) angle += 360.0f;
+            
+            // Determine bin indices
+            // Magnitude bins: divide by reasonable max value (e.g., 255 for 8-bit)
+            int mag_bin = static_cast<int>((magnitude * mag_bins) / 256.0f);
+            mag_bin = std::min(mag_bin, mag_bins - 1);
+            
+            // Angle bins: 0-360 degrees
+            int angle_bin = static_cast<int>((angle * angle_bins) / 360.0f);
+            angle_bin = std::min(angle_bin, angle_bins - 1);
+            
+            // Increment histogram
+            histogram[mag_bin][angle_bin]++;
+        }
+    }
+    
+    // Normalize histogram
+    float sum = 0.0f;
+    for(const auto &row : histogram) {
+        for(float value : row) {
+            sum += value;
+        }
+    }
+    
+    if(sum > 0) {
+        for(auto &row : histogram) {
+            for(float &value : row) {
+                value /= sum;
+            }
+        }
+    }
+    
+    return histogram;
+}
+
+// Create a Gabor kernel
+cv::Mat create_gabor_kernel(int ksize, double sigma, double theta, double lambda, double gamma, double psi) {
+    // ksize: kernel size
+    // sigma: standard deviation of Gaussian envelope
+    // theta: orientation of the normal to the parallel stripes (in radians)
+    // lambda: wavelength of the sinusoidal factor
+    // gamma: spatial aspect ratio
+    // psi: phase offset
+    
+    cv::Mat kernel(ksize, ksize, CV_32F);
+    int half_size = ksize / 2;
+    
+    double sigma_x = sigma;
+    double sigma_y = sigma / gamma;
+    
+    for(int y = -half_size; y <= half_size; y++) {
+        for(int x = -half_size; x <= half_size; x++) {
+            // Rotate coordinates
+            double x_theta = x * std::cos(theta) + y * std::sin(theta);
+            double y_theta = -x * std::sin(theta) + y * std::cos(theta);
+            
+            // Gabor formula
+            double gaussian = std::exp(-0.5 * (x_theta * x_theta / (sigma_x * sigma_x) + 
+                                                y_theta * y_theta / (sigma_y * sigma_y)));
+            double sinusoid = std::cos(2.0 * M_PI * x_theta / lambda + psi);
+            
+            kernel.at<float>(y + half_size, x + half_size) = gaussian * sinusoid;
+        }
+    }
+    
+    return kernel;
+}
+
+// Compute Gabor features for an image
+std::vector<float> compute_gabor_features(const cv::Mat &image) {
+    std::vector<float> features;
+    
+    // Convert to grayscale
+    cv::Mat gray;
+    if(image.channels() == 3) {
+        cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+    } else {
+        gray = image.clone();
+    }
+    
+    // Convert to float
+    cv::Mat gray_float;
+    gray.convertTo(gray_float, CV_32F);
+    
+    // Gabor filter parameters
+    int ksize = 21;                           // Kernel size
+    double sigma = 5.0;                       // Standard deviation
+    double gamma = 0.5;                       // Aspect ratio
+    double psi = 0;                           // Phase offset
+    
+    // Multiple scales (wavelengths)
+    std::vector<double> lambdas = {5.0, 10.0, 15.0, 20.0};  // 4 scales
+    
+    // Multiple orientations
+    std::vector<double> thetas = {0, M_PI/4, M_PI/2, 3*M_PI/4};  // 4 orientations (0, 45, 90, 135 degrees)
+    
+    // Apply Gabor filters at different scales and orientations
+    for(double lambda : lambdas) {
+        for(double theta : thetas) {
+            // Create Gabor kernel
+            cv::Mat kernel = create_gabor_kernel(ksize, sigma, theta, lambda, gamma, psi);
+            
+            // Apply filter
+            cv::Mat filtered;
+            cv::filter2D(gray_float, filtered, CV_32F, kernel);
+            
+            // Compute statistics (mean and standard deviation) of the filtered response
+            cv::Scalar mean, stddev;
+            cv::meanStdDev(filtered, mean, stddev);
+            
+            // Use mean and stddev as features
+            features.push_back(mean[0]);
+            features.push_back(stddev[0]);
+        }
+    }
+    
+    // Normalize features to [0, 1] range
+    if(!features.empty()) {
+        float max_val = *std::max_element(features.begin(), features.end());
+        float min_val = *std::min_element(features.begin(), features.end());
+        float range = max_val - min_val;
+        
+        if(range > 0) {
+            for(float &f : features) {
+                f = (f - min_val) / range;
+            }
+        }
+    }
+    
+    return features;
+}
+
+// Compute cosine similarity between two feature vectors
+float compute_cosine_similarity(const std::vector<float> &a, const std::vector<float> &b) {
+    if(a.size() != b.size() || a.empty()) {
+        printf("Error: Feature vectors have incompatible sizes for cosine similarity\n");
+        return 0.0f;
+    }
+    
+    float dot_product = 0.0f;
+    float norm_a = 0.0f;
+    float norm_b = 0.0f;
+    
+    for(size_t i = 0; i < a.size(); i++) {
+        dot_product += a[i] * b[i];
+        norm_a += a[i] * a[i];
+        norm_b += b[i] * b[i];
+    }
+    
+    norm_a = std::sqrt(norm_a);
+    norm_b = std::sqrt(norm_b);
+    
+    if(norm_a == 0.0f || norm_b == 0.0f) {
+        return 0.0f;
+    }
+    
+    return dot_product / (norm_a * norm_b);
+}
+
 // Compute histogram intersection for 3D histograms
 float histogram_intersection_3D(const std::vector<std::vector<std::vector<float>>> &hist1, 
                                 const std::vector<std::vector<std::vector<float>>> &hist2) {
@@ -471,6 +854,24 @@ float histogram_intersection_3D(const std::vector<std::vector<std::vector<float>
             for(size_t k = 0; k < hist1[i][j].size(); k++) {
                 intersection += std::min(hist1[i][j][k], hist2[i][j][k]);
             }
+        }
+    }
+    return intersection;
+}
+
+// Compute histogram intersection for 2D histograms
+float histogram_intersection_2D(const std::vector<std::vector<float>> &hist1,
+                                const std::vector<std::vector<float>> &hist2) {
+    // Check dimensions match
+    if(hist1.size() != hist2.size() || hist1[0].size() != hist2[0].size()) {
+        printf("Error: 2D Histogram dimensions don't match\n");
+        return 0.0f;
+    }
+    
+    float intersection = 0.0f;
+    for(size_t i = 0; i < hist1.size(); i++) {
+        for(size_t j = 0; j < hist1[i].size(); j++) {
+            intersection += std::min(hist1[i][j], hist2[i][j]);
         }
     }
     return intersection;
