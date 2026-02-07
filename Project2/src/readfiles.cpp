@@ -18,6 +18,9 @@
 #include <string>
 #include <functional>
 #include <cmath>
+#include <fstream>
+#include <sstream>
+#include <map>
 
 // Function declarations
 std::vector<float> extract_feature_vector(const cv::Mat &image);
@@ -32,6 +35,8 @@ float histogram_intersection_3D(const std::vector<std::vector<std::vector<float>
 float histogram_intersection_2D(const std::vector<std::vector<float>> &hist1,
                                 const std::vector<std::vector<float>> &hist2);
 float compute_cosine_similarity(const std::vector<float> &a, const std::vector<float> &b);
+float compute_cosine_distance(const std::vector<float> &a, const std::vector<float> &b);
+std::map<std::string, std::vector<float>> read_features_from_csv(const std::string &csv_path);
 
 struct ImageMatch {
     std::string filename;
@@ -57,7 +62,7 @@ int main(int argc, char *argv[]) {
 
     // Check for sufficient arguments
     if(argc < 5) {
-        printf("usage: %s <directory path> <target file path> [Top N matches] [Matching method]\n", argv[0]);
+        printf("usage: %s <directory path> <target file path> [Top N matches] [Matching method] [optional: csv file path]\n", argv[0]);
         exit(-1);
     }
 
@@ -98,7 +103,82 @@ int main(int argc, char *argv[]) {
     // Check matching method
     std::string method = argv[4];
 
-    if(method == "ssd") {
+    if(method == "csv-cosine") {
+        // Check if CSV file path is provided
+        if(argc < 6) {
+            printf("Error: CSV file path required for csv-cosine method\n");
+            printf("usage: %s <directory path> <target file path> [Top N matches] csv-cosine <csv file path>\n", argv[0]);
+            closedir(dirp);
+            exit(-1);
+        }
+        
+        std::string csv_path = argv[5];
+        printf("Using CSV-based cosine distance matching method\n");
+        printf("Reading features from: %s\n", csv_path.c_str());
+        
+        // Read all features from CSV
+        std::map<std::string, std::vector<float>> feature_database = read_features_from_csv(csv_path);
+        
+        if(feature_database.empty()) {
+            printf("Error: Could not read features from CSV file or CSV is empty\n");
+            closedir(dirp);
+            exit(-1);
+        }
+        
+        printf("Loaded %zu feature vectors from CSV\n", feature_database.size());
+        
+        // Get the target filename (basename without path)
+        std::string target_path = argv[2];
+        size_t last_slash = target_path.find_last_of("/\\");
+        std::string target_filename = (last_slash != std::string::npos) ? 
+                                      target_path.substr(last_slash + 1) : target_path;
+        
+        // Find target features in database
+        auto target_it = feature_database.find(target_filename);
+        if(target_it == feature_database.end()) {
+            printf("Error: Target image '%s' not found in CSV feature database\n", target_filename.c_str());
+            closedir(dirp);
+            exit(-1);
+        }
+        
+        std::vector<float> target_features = target_it->second;
+        printf("Target image: %s (feature dimension: %zu)\n", target_filename.c_str(), target_features.size());
+        
+        // Vector to store matches
+        std::vector<ImageMatch> matches;
+        
+        // Compare with all images in the database
+        for(const auto &entry : feature_database) {
+            const std::string &filename = entry.first;
+            const std::vector<float> &features = entry.second;
+            
+            // Skip the target image itself
+            if(filename == target_filename) {
+                continue;
+            }
+            
+            // Compute cosine distance
+            float distance = compute_cosine_distance(target_features, features);
+            
+            printf("Comparing with %s: cosine distance = %.4f\n", filename.c_str(), distance);
+            
+            // Store the result
+            ImageMatch match;
+            match.filename = filename;
+            match.score = distance;
+            matches.push_back(match);
+        }
+        
+        // Sort by distance (ascending - lower distance is better)
+        std::sort(matches.begin(), matches.end(), compare_ascending);
+        
+        printf("\nTop %d matches:\n", top_n);
+        for(int i = 0; i < top_n && i < (int)matches.size(); i++) {
+            printf("Match %d: %s with cosine distance = %.4f\n", 
+                   i + 1, matches[i].filename.c_str(), matches[i].score);
+        }
+        
+    } else if(method == "ssd") {
         printf("Using SSD matching method\n");
         
         // Find feature vector for the target image
@@ -477,7 +557,7 @@ int main(int argc, char *argv[]) {
         
     } else {
         printf("Unknown matching method: %s\n", method.c_str());
-        printf("Available methods: ssd, histogram, multi-histogram, color-texture, gabor, color-gabor\n");
+        printf("Available methods: ssd, histogram, multi-histogram, color-texture, gabor, color-gabor, csv-cosine, csv-cosine-similarity\n");
         closedir(dirp);
         exit(-1);
     }
@@ -485,6 +565,82 @@ int main(int argc, char *argv[]) {
     printf("\nTerminating\n");
     closedir(dirp);  
     return 0;
+}
+
+// Read feature vectors from CSV file
+// Expected format: filename, feature1, feature2, ..., feature512
+std::map<std::string, std::vector<float>> read_features_from_csv(const std::string &csv_path) {
+    std::map<std::string, std::vector<float>> feature_database;
+    
+    std::ifstream file(csv_path);
+    if(!file.is_open()) {
+        printf("Error: Could not open CSV file: %s\n", csv_path.c_str());
+        return feature_database;
+    }
+    
+    std::string line;
+    int line_number = 0;
+    
+    // Read header line (optional, skip if exists)
+    if(std::getline(file, line)) {
+        line_number++;
+        // Check if first line is a header by seeing if first column contains "filename" or similar
+        if(line.find("filename") != std::string::npos || line.find("image") != std::string::npos) {
+            printf("Skipping header line\n");
+        } else {
+            // First line is data, process it
+            file.seekg(0);  // Reset to beginning
+            line_number = 0;
+        }
+    }
+    
+    // Read each line
+    while(std::getline(file, line)) {
+        line_number++;
+        
+        if(line.empty()) continue;
+        
+        std::stringstream ss(line);
+        std::string filename;
+        std::vector<float> features;
+        
+        // Read filename (first column)
+        if(!std::getline(ss, filename, ',')) {
+            printf("Warning: Line %d - Could not read filename\n", line_number);
+            continue;
+        }
+        
+        // Trim whitespace from filename
+        filename.erase(0, filename.find_first_not_of(" \t\r\n"));
+        filename.erase(filename.find_last_not_of(" \t\r\n") + 1);
+        
+        // Read feature values
+        std::string value_str;
+        while(std::getline(ss, value_str, ',')) {
+            try {
+                float value = std::stof(value_str);
+                features.push_back(value);
+            } catch(const std::exception& e) {
+                printf("Warning: Line %d - Could not parse feature value: %s\n", 
+                       line_number, value_str.c_str());
+                continue;
+            }
+        }
+        
+        if(features.empty()) {
+            printf("Warning: Line %d - No features found for %s\n", line_number, filename.c_str());
+            continue;
+        }
+        
+        // Store in database
+        feature_database[filename] = features;
+        printf("Loaded %s with %zu features\n", filename.c_str(), features.size());
+    }
+    
+    file.close();
+    printf("Successfully loaded %zu entries from CSV\n", feature_database.size());
+    
+    return feature_database;
 }
 
 // Extract 7x7 feature vector from center of image
@@ -592,7 +748,7 @@ std::vector<std::vector<std::vector<float>>> compute_3D_histogram(const cv::Mat 
     return histogram;
 }
 
-// Compute 3D histogram for a specific row region
+// Compute 3D histogram for a specific row region (RGB color space with 8 bins per channel)
 std::vector<std::vector<std::vector<float>>> compute_3D_histogram_region(
     const cv::Mat &image, int bins, int start_row, int end_row) {
     
@@ -715,13 +871,6 @@ std::vector<std::vector<float>> compute_texture_histogram(const cv::Mat &image, 
 
 // Create a Gabor kernel
 cv::Mat create_gabor_kernel(int ksize, double sigma, double theta, double lambda, double gamma, double psi) {
-    // ksize: kernel size
-    // sigma: standard deviation of Gaussian envelope
-    // theta: orientation of the normal to the parallel stripes (in radians)
-    // lambda: wavelength of the sinusoidal factor
-    // gamma: spatial aspect ratio
-    // psi: phase offset
-    
     cv::Mat kernel(ksize, ksize, CV_32F);
     int half_size = ksize / 2;
     
@@ -810,7 +959,7 @@ std::vector<float> compute_gabor_features(const cv::Mat &image) {
     return features;
 }
 
-// Compute cosine similarity between two feature vectors
+// Compute cosine similarity between two feature vectors (returns 0 to 1, higher is better)
 float compute_cosine_similarity(const std::vector<float> &a, const std::vector<float> &b) {
     if(a.size() != b.size() || a.empty()) {
         printf("Error: Feature vectors have incompatible sizes for cosine similarity\n");
@@ -835,6 +984,12 @@ float compute_cosine_similarity(const std::vector<float> &a, const std::vector<f
     }
     
     return dot_product / (norm_a * norm_b);
+}
+
+// Compute cosine distance between two feature vectors (returns 0 to 2, lower is better)
+float compute_cosine_distance(const std::vector<float> &a, const std::vector<float> &b) {
+    float similarity = compute_cosine_similarity(a, b);
+    return 1.0f - similarity;  // Distance = 1 - similarity
 }
 
 // Compute histogram intersection for 3D histograms
