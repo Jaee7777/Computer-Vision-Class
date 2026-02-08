@@ -13,7 +13,3 @@ include_directories( ${OpenCV_INCLUDE_DIRS} )
 # Executable
 add_executable( readfiles src/readfiles.cpp )
 target_link_libraries( readfiles ${OpenCV_LIBS} )
-
-add_executable( imgDisplay
-    src/imgDisplay.cpp )
-target_link_libraries( imgDisplay ${OpenCV_LIBS} )
