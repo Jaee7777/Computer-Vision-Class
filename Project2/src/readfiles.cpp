@@ -1,8 +1,19 @@
 /*
   Jaee Oh
-  Project 2
+  Spring 2026
+
+  CS 5330 Computer Vision
+
+  Project 2.
 
   Modified from the template given by Professor Maxwell
+  
+  OpenCV Documentation was the final source for verification of each function.
+  (https://docs.opencv.org/4.x/d9/df8/tutorial_root.html)
+  AI Overview of Google was used to find related functions.
+  Autocorrection done by local Qwen 2.5 model.
+  Claude AI was used for code review and debugging.
+
 */
 #include <cstdio>
 #include <cstring>
