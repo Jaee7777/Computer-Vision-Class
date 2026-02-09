@@ -3,9 +3,17 @@
 
 - the command follows following format, assuming Cmake was used on build/ directory:
 ```
-./build/readfiles <directory path> <target file path> [Top N matches] [Matching method] [optional: csv file path]
+./build/readfiles <directory path> <target file path> [Top N matches] [Matching method] [optional: csv file path] [optional: --least-similar]
 ```
-- [optional: csv file path] field is only required when `csv-cosine` method is selected.
+- [optional: csv file path] field is only required when the moethod requires csv file.
+- [optional: --least-similar] can be used for any method.
+- Command examples:
+```
+  ./build/readfiles images/ target.jpg 5 histogram
+  ./build/readfiles images/ target.jpg 5 histogram --least-similar
+  ./build/readfiles images/ target.jpg 5 dnn-color-texture features.csv
+  ./build/readfiles images/ target.jpg 5 dnn-color-texture features.csv --least-similar
+```
 
 - Possible Matching methods are:
   - ssd
@@ -15,6 +23,7 @@
   - gabor
   - color-gabor
   - csv-cosine
+  - dnn-color-texture 
 
 ## Part 1: SSD
 ```
@@ -197,4 +206,120 @@ Match 1: data/pic.0948.jpg with SSD = 0.00
 Match 2: data/pic.0176.jpg with SSD = 1680.00
 Match 3: data/pic.0668.jpg with SSD = 1810.00
 Match 4: data/pic.0064.jpg with SSD = 1954.00
+```
+
+## Part 7: pic.1087.jpg
+
+- DNN + Color + Texture for similar images:
+```
+=== Top 5 Matches ===
+Match 1: data//pic.1086.jpg
+  Combined score: 0.8341
+Match 2: data//pic.1085.jpg
+  Combined score: 0.8324
+Match 3: data//pic.1084.jpg
+  Combined score: 0.8244
+Match 4: data//pic.0711.jpg
+  Combined score: 0.7933
+Match 5: data//pic.1094.jpg
+  Combined score: 0.7763
+```
+
+- DNN + Color + Texture for least similar images:
+```
+=== Top 5 LEAST Similar Matches ===
+Match 1: data//pic.0511.jpg
+  Combined score: 0.1847
+Match 2: data//pic.0084.jpg
+  Combined score: 0.2053
+Match 3: data//pic.0037.jpg
+  Combined score: 0.2545
+Match 4: data//pic.0174.jpg
+  Combined score: 0.2662
+Match 5: data//pic.0377.jpg
+  Combined score: 0.2674
+```
+
+## Part 7: pic.0516.jpg
+- DNN + Color + Texture for similar images:
+```
+== Top 5 MOST Similar Matches ===
+Match 1: data//pic.0526.jpg
+  Combined score: 0.7497
+Match 2: data//pic.0514.jpg
+  Combined score: 0.7359
+Match 3: data//pic.0515.jpg
+  Combined score: 0.6896
+Match 4: data//pic.0151.jpg
+  Combined score: 0.6734
+Match 5: data//pic.1053.jpg
+  Combined score: 0.6728
+```
+
+- DNN + Color + Texture for least similar images:
+```
+=== Top 5 LEAST Similar Matches ===
+Match 1: data//pic.1068.jpg
+  Combined score: 0.2342
+Match 2: data//pic.0251.jpg
+  Combined score: 0.2508
+Match 3: data//pic.0954.jpg
+  Combined score: 0.2546
+Match 4: data//pic.1009.jpg
+  Combined score: 0.2558
+Match 5: data//pic.0250.jpg
+  Combined score: 0.2692
+```
+
+## Extension 1: pic.1087.jpg
+- Dominant color texture using k=5 dominant colors of Kmeans and 16 bins 2D histogram of magnitude Sobel:
+```
+Top 4 MOST similar matches:
+Match 1: data//pic.1087.jpg with score = 0.9989
+Match 2: data//pic.0818.jpg with score = 0.9582
+Match 3: data//pic.0716.jpg with score = 0.9547
+Match 4: data//pic.1084.jpg with score = 0.9462
+```
+
+- Edge density using Canny Edge Detection (https://docs.opencv.org/4.x/da/d22/tutorial_py_canny.html):
+```
+Top 4 MOST similar matches:
+Match 1: data//pic.1087.jpg with similarity = 1.0000
+Match 2: data//pic.0139.jpg with similarity = 0.8912
+Match 3: data//pic.0818.jpg with similarity = 0.8908
+Match 4: data//pic.0141.jpg with similarity = 0.8867
+```
+
+- Chi-square distance on 8-bin 3D RGB channels histogram:
+```
+Top 4 MOST similar matches:
+Match 1: data//pic.1087.jpg with similarity = 1.0000
+Match 2: data//pic.1085.jpg with similarity = 0.8996
+Match 3: data//pic.1084.jpg with similarity = 0.8782
+Match 4: data//pic.1086.jpg with similarity = 0.8575
+```
+
+- Hamming distance on 7x7 center feature vector:
+```
+Top 4 MOST similar matches:
+Match 1: data//pic.1087.jpg with similarity = 1.0000
+Match 2: data//pic.0348.jpg with similarity = 0.7279
+Match 3: data//pic.0491.jpg with similarity = 0.7279
+Match 4: data//pic.0478.jpg with similarity = 0.7143
+```
+
+## Extension 2: pic.1047.jpg
+- dnn-color-texture method applied on images with faces:
+```
+=== Top 5 MOST Similar Matches (with faces) ===
+Match 1: data//pic.0226.jpg
+  Combined score: 0.7275
+Match 2: data//pic.0321.jpg
+  Combined score: 0.7184
+Match 3: data//pic.0403.jpg
+  Combined score: 0.7121
+Match 4: data//pic.0842.jpg
+  Combined score: 0.7084
+Match 5: data//pic.0006.jpg
+  Combined score: 0.7064
 ```
