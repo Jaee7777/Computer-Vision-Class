@@ -112,16 +112,16 @@ int main(int argc, char *argv[]) {
 						cv::Scalar(255, 255, 0), 1);
 
 			// =========Axis of the least central moment and bounding box of the region =========
-			cv::Mat mask = (labels == i);
-			cv::Moments m = cv::moments(mask, true);
+			cv::Mat mask = (labels == i); // Binary mask for i-th region
+			cv::Moments m = cv::moments(mask, true); // Moment of i-th region
 			std::vector<cv::Point> points;
-			cv::findNonZero(mask, points);
-			cv::RotatedRect rrect = cv::minAreaRect(points);
+			cv::findNonZero(mask, points); // Find all points in i-th region
+			cv::RotatedRect rrect = cv::minAreaRect(points); // Smallest rectangle enclosing i-th region
 			cv::Point2f corners[4];
-			rrect.points(corners);
+			rrect.points(corners); // Find 4 corners of the rectangle enclosing i-th region
+			double angle = rrect.angle * CV_PI / 180.0; // Orientation of i-th region
 
 			// Axis of the least central moment
-			double angle = rrect.angle * CV_PI / 180.0;
 			cv::Point offset(AXIS_LENGTH*cos(angle), AXIS_LENGTH*sin(angle));
 			cv::line(frame_feature,
 					cv::Point(center.x - offset.x, center.y - offset.y),
