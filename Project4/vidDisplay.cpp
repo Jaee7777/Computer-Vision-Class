@@ -44,6 +44,10 @@ int main(int argc, char *argv[])
 
     bool last_found = false;
 
+    std::vector<std::vector<cv::Point2f>> corner_list; // 2D corners
+    std::vector<std::vector<cv::Point3f>> point_list; // 3D points
+    int calib_count = 0; 
+
     while (true)
     {
         capdev >> frame;
@@ -105,8 +109,68 @@ int main(int argc, char *argv[])
         cv::imshow("Video", frame);
 
         int key = cv::waitKey(10);
-        if (key == 'q')
+        if (key == 'q') { // Quit
             break;
+        } else if (key == 's') { // Save calibration frame
+            if (found && !corner_set.empty()) { // Save when checkboard corners found
+                corner_list.push_back(corner_set); // Save 2D coordinates of corners
+
+                std::vector<cv::Point3f> point_set;
+                for (int r = 0; r < pattern_size.height; r++) {
+                    for (int c = 0; c < pattern_size.width; c++) {
+                        point_set.push_back(cv::Point3f((float)c, (float)-r, 0.0f));
+                    }
+                }
+                point_list.push_back(point_set); // Save 3D coordinates of corners (Z=0 is checkerboard plane)
+
+                // Save calibration image
+                std::string fname = "calib_" + std::to_string(calib_count++) + ".jpg";
+                cv::imwrite(fname, frame);
+
+                std::cout << "Saved calibration frame: " << fname
+                          << "  (total: " << corner_list.size() << ")" << std::endl;
+            } else {
+                std::cout << "Not saved, because checkerboard not detected." << std::endl;
+            }
+        } else if (key == 'c') { // Calibrate camera
+            if (corner_list.size() < 5) {
+                std::cout << "Need at least 5 calibration frames, but given: "
+                        << corner_list.size() << std::endl;
+            } else {
+                // Camera matrix initialization
+                cv::Mat camera_matrix = cv::Mat::eye(3, 3, CV_64F);
+                camera_matrix.at<double>(0, 0) = 1;  // fx guess
+                camera_matrix.at<double>(1, 1) = 1;  // fy guess
+                camera_matrix.at<double>(0, 2) = frame.cols / 2.0;  // cx = image center
+                camera_matrix.at<double>(1, 2) = frame.rows / 2.0;  // cy = image center
+
+                cv::Mat dist_coeffs = cv::Mat::zeros(8, 1, CV_64F);
+
+                std::vector<cv::Mat> rvecs, tvecs;
+
+                double rms = cv::calibrateCamera(
+                    point_list,
+                    corner_list,
+                    frame.size(),
+                    camera_matrix,
+                    dist_coeffs,
+                    rvecs,
+                    tvecs,
+                    cv::CALIB_FIX_ASPECT_RATIO
+                );
+
+                std::cout << "Calibration RMS error: " << rms << std::endl;
+                std::cout << "Camera matrix:\n" << camera_matrix << std::endl;
+                std::cout << "Distortion coefficients:\n" << dist_coeffs << std::endl;
+
+                // Save calibration results to file
+                cv::FileStorage fs("calibration.yml", cv::FileStorage::WRITE);
+                fs << "camera_matrix" << camera_matrix;
+                fs << "dist_coeffs" << dist_coeffs;
+                fs.release();
+                std::cout << "Saved to calibration.yml" << std::endl;
+            }
+        }
     }
 
     return 0;
