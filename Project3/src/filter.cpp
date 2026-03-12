@@ -252,3 +252,29 @@ int closing(const cv::Mat &src, cv::Mat &dst, int radius) {
     erode(tmp, dst, radius);
     return 0;
 }
+
+// Compute Sum of Squared Differences
+float compute_ssd(const std::vector<float> &a, const std::vector<float> &b) {
+    if(a.size() != b.size()) {
+        printf("Error: Feature vectors have different sizes\n");
+        return -1.0f;
+    }
+    
+    float sum = 0.0f;
+    for(size_t i = 0; i < a.size(); i++) {
+        float diff = a[i] - b[i];
+        sum += diff * diff;
+    }
+    return sum;
+}
+
+// Cosine distance
+float cosineDist(const std::vector<float> &a, const std::vector<float> &b) {
+    float dot=0, na=0, nb=0;
+    for (int i = 0; i < (int)a.size(); i++) {
+        dot += a[i]*b[i];
+        na  += a[i]*a[i];
+        nb  += b[i]*b[i];
+    }
+    return 1.0f - dot / (sqrt(na)*sqrt(nb) + 1e-8f);
+}

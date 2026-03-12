@@ -27,5 +27,7 @@ int erode(const cv::Mat &src, cv::Mat &dst, int radius = 1);
 int dilate(const cv::Mat &src, cv::Mat &dst, int radius = 1);
 int opening(const cv::Mat &src, cv::Mat &dst, int radius = 1);
 int closing(const cv::Mat &src, cv::Mat &dst, int radius = 1);
+float compute_ssd(const std::vector<float> &a, const std::vector<float> &b);
+float cosineDist(const std::vector<float> &a, const std::vector<float> &b);
 
 #endif
