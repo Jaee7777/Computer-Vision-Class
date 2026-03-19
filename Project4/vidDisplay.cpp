@@ -13,7 +13,6 @@
   AI Overview of Google was used to find related functions.
   Claude AI was used for code review and debugging.
 */
-
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <vector>
@@ -65,6 +64,7 @@ void drawCube(
 
     auto p = [&](int i) { return cv::Point(cube_2d[i]); };
 
+    // --- Filled faces (BGR color order) ---
     // Front face — Red
     std::vector<cv::Point> front_face = {p(0), p(1), p(5), p(4)};
     cv::fillConvexPoly(frame, front_face, {0, 0, 220});
@@ -218,7 +218,8 @@ int main(int argc, char *argv[])
     }
 
     bool show_harris = false;
-    bool show_cube   = true;   // NEW: toggle virtual cube with 'v'
+    bool show_cube   = true;   // toggle virtual cube with 'v'
+    int  axes_count  = 0;      // separate counter for axes/AR saves
 
     // ============================================
     // Main loop
@@ -282,7 +283,7 @@ int main(int argc, char *argv[])
             std::cout << "Harris: " << (show_harris ? "ON" : "OFF") << std::endl;
 
         } else if (key == 'v') {
-            // NEW: toggle virtual cube
+            // toggle virtual cube
             show_cube = !show_cube;
             std::cout << "Virtual cube: " << (show_cube ? "ON" : "OFF") << std::endl;
 
@@ -316,9 +317,9 @@ int main(int argc, char *argv[])
             }
 
         } else if (key == 'a') {
-            // NEW: save current frame with axes (and cube if enabled)
+            // save current frame with axes (and cube if enabled)
             if (found && calibrated) {
-                std::string fname = "axes_" + std::to_string(calib_count) + ".jpg";
+                std::string fname = "axes_" + std::to_string(axes_count++) + ".jpg";
                 cv::imwrite(fname, frame);
                 std::cout << "Saved axes/AR frame: " << fname << std::endl;
             } else {

@@ -29,7 +29,7 @@ make
 |-----|--------|
 | `s` | Save corners-only calibration image + store frame data |
 | `c` | Run calibration (requires 5+ saved frames) |
-| `a` | Save current frame with axes/cube overlay |
+| `a` | Save current frame with axes/cube overlay (press multiple times as you move the board) |
 | `v` | Toggle virtual cube on/off |
 | `h` | Toggle Harris corner detection |
 | `q` | Quit |
