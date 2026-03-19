@@ -3,6 +3,13 @@
 
 ## Requirements
 - OpenCV 4.x with `opencv_contrib` (required for SURF)
+```
+# Ubuntu/Debian
+sudo apt install libopencv-contrib-dev
+
+# macOS with Homebrew
+brew install opencv
+```
 - A printed 10x7 checkerboard (9x6 inner corners)
 - Measure one square on your board and update `square_size_mm` in `vidDisplay.cpp`
 

@@ -15,7 +15,6 @@
 
 */
 #include <opencv2/opencv.hpp>
-#include <opencv2/xfeatures2d.hpp>
 #include <iostream>
 #include <vector>
 
@@ -95,26 +94,6 @@ void drawCube(
     cv::line(frame, cube_2d[1], cube_2d[5], {50, 50, 50}, 2);
     cv::line(frame, cube_2d[2], cube_2d[6], {50, 50, 50}, 2);
     cv::line(frame, cube_2d[3], cube_2d[7], {50, 50, 50}, 2);
-}
-
-// ============================================
-// Draw SURF keypoints on the frame
-// ============================================
-void drawSURF(cv::Mat &frame, const cv::Mat &gray,
-              cv::Ptr<cv::xfeatures2d::SURF> &detector)
-{
-    std::vector<cv::KeyPoint> keypoints;
-    cv::Mat descriptors;
-
-    // Finds keypoints and computes descriptors
-    detector->detectAndCompute(gray, cv::noArray(), keypoints, descriptors);
-
-    cv::drawKeypoints(frame, keypoints, frame,
-        cv::Scalar(0, 255, 0),
-        cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-
-    cv::putText(frame, "SURF ON  keypoints: " + std::to_string(keypoints.size()),
-        {10, 60}, cv::FONT_HERSHEY_SIMPLEX, 0.8, {0, 255, 0}, 2);
 }
 
 // ============================================
@@ -212,6 +191,7 @@ int main(int argc, char *argv[])
     // Open video camera
     // ============================================
     cv::VideoCapture capdev(0);
+    // cv::VideoCapture capdev(0, cv::CAP_V4L2);
     if (!capdev.isOpened()) {
         std::cout << "Unable to open video device\n";
         return -1;
@@ -255,12 +235,8 @@ int main(int argc, char *argv[])
         std::cout << "No calibration file found, starting with uncalibrated camera." << std::endl;
     }
 
-    // Harris and SURF flags
+    // Harris  flags
     bool show_harris = false;
-    bool show_surf   = false;
-
-    // SURF detector
-    cv::Ptr<cv::xfeatures2d::SURF> surf_detector = cv::xfeatures2d::SURF::create(400);
 
     // ============================================
     // Enter Loop for Video Display and Processing
@@ -283,11 +259,6 @@ int main(int argc, char *argv[])
         if (show_harris)
             drawHarris(frame, gray);
 
-        // ============================================
-        // SURF feature overlay (toggle with 'u')
-        // ============================================
-        if (show_surf)
-            drawSURF(frame, gray, surf_detector);
 
         // Clear corners from previous frame
         corner_set.clear();
@@ -362,11 +333,6 @@ int main(int argc, char *argv[])
             // Toggle Harris corner overlay
             show_harris = !show_harris;
             std::cout << "Harris: " << (show_harris ? "ON" : "OFF") << std::endl;
-
-        } else if (key == 'u') {
-            // Toggle SURF feature overlay
-            show_surf = !show_surf;
-            std::cout << "SURF: " << (show_surf ? "ON" : "OFF") << std::endl;
 
         } else if (key == 's') {
             // Save calibration frame
