@@ -238,7 +238,7 @@ def plot_experiment(configs_results, title, save_path, epochs):
     plt.show()
 
 
-def plot_summary(all_results, save_path="experiment_summary.png"):
+def plot_summary(all_results, save_path="plot/experiment_summary.png"):
     """Plots a bar chart comparing best test accuracy across all experiment configs."""
     labels, accs, times = [], [], []
     for configs_results in all_results.values():
@@ -374,7 +374,7 @@ def main(argv):
 
         # plot results for this experiment dimension
         safe_name = exp_name.lower().replace(" ", "_").replace("&", "and")
-        plot_experiment(configs_results, exp_name, f"exp_{safe_name}.png", epochs)
+        plot_experiment(configs_results, exp_name, f"plot/exp_{safe_name}.png", epochs)
 
     # summary plot and CSV across all experiments
     plot_summary(all_results)
