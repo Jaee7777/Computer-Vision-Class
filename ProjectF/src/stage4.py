@@ -12,7 +12,8 @@ from dragon_core import (
     get_head_pose,
     compute_targets,
 )
-import time
+
+# import time
 
 
 SURFACES = [
@@ -189,9 +190,9 @@ def draw_dragon(canvas, targets):
 
 cap = cv2.VideoCapture(0)
 
-frame_times = []
+# frame_times = []
 while True:
-    t0 = time.perf_counter()
+    # t0 = time.perf_counter()
     ret, frame = cap.read()
     if not ret:
         break
@@ -219,14 +220,14 @@ while True:
             1,
         )
 
-    frame_times.append(time.perf_counter() - t0)
-    if len(frame_times) == 300:
-        import numpy as np
+    # frame_times.append(time.perf_counter() - t0)
+    # if len(frame_times) == 300:
+    #    import numpy as np
 
-        times = np.array(frame_times)
-        fps = 1.0 / times
-        print(f"Mean FPS: {fps.mean():.1f}  Std: {fps.std():.1f}")
-        break
+    #    times = np.array(frame_times)
+    #    fps = 1.0 / times
+    #    print(f"Mean FPS: {fps.mean():.1f}  Std: {fps.std():.1f}")
+    #    break
 
     cv2.imshow("stage4 dragon", np.hstack([frame, canvas]))
     if cv2.waitKey(10) & 0xFF in (ord("q"), 27):
